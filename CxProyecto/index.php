@@ -6,29 +6,49 @@
 
     $conn = mysqli_connect($dbServername,$dbUsername,$dbPassword,$dbName);
 
-    $mostrarTabla = false;
     $ipFinal ="";
     $ipInicial = "";
     $bdVacio = true;
+    $buscar = false;
+    $actualizar = false;
+    $eliminar = false;
 
-    if($_SERVER['REQUEST_METHOD'] == "POST"){
+    if(empty($_POST['ip-inicial'])){
+        $errorIpInicial = "Por favor introduce una IP inicial";
+    } 
+    else {
+        $ipInicial = $_POST['ip-inicial'];
 
-        if(empty($_POST['ip-inicial'])){
-            $errorIpInicial = "Por favor introduce una IP inicial";
-        } 
-        else {
-            $ipInicial = $_POST['ip-inicial'];
+        if(empty($_POST['ip-final'])){
+            $ipFinal = $ipInicial;
+        } else {
+            $ipFinal = $_POST['ip-final'];
+        }
+    } 
 
-            if(empty($_POST['ip-final'])){
-                $ipFinal = $ipInicial;
-            } else {
-                $ipFinal = $_POST['ip-final'];
-            }
-            $mostrarTabla = true;
-        } 
+    if(isset($_POST['buscar'])){
+        $buscar = true;
+        $actualizar = false;
+        $eliminar = false;
     }
 
-    
+    if(isset($_POST['actualizar'])){
+        $actualizar = true;
+        $buscar = false;
+        $eliminar = false;
+    }
+
+    if(isset($_POST['eliminar'])){
+        $actualizar = false;
+        $buscar = false;
+        $eliminar = true;
+    }
+
+    function buscar_rango($inicio, $fin) {
+        $inicio = ip2long($inicio);
+        $fin = ip2long($fin);
+        return array_map('long2ip', range($inicio, $fin) );
+    }
 
 
 ?>
@@ -62,7 +82,7 @@
         <div class="contenedor-campos">
             <div class="campos">
                 <label for="">Direccion inicial</label>
-                <input class="input-text" type="text" placeholder="192.123.1.0" name="ip-inicial" value="<?php 
+                <input class="input-text" type="text" placeholder="0.0.0.0" name="ip-inicial" value="<?php 
                 if(empty($ipInicial)){
                     echo "";
                 } else {
@@ -73,25 +93,27 @@
             </div>
             <div class="campos">
                 <label for="">Direccion final (opcional)</label>
-                <input class="input-text" type="text" placeholder="192.123.1.5" name="ip-final">
+                <input class="input-text" type="text" placeholder="0.0.0.0" name="ip-final">
             </div>
             <div class="">
-                <input class="boton " type="submit" value="Buscar">
+                <input class="boton " type="submit" value="Buscar" name="buscar">
+            </div>
+            <div class="">
+                <input class="boton " type="submit" value="Actualizar" name="actualizar">
+            </div>
+            <div class="">
+                <input class="boton " type="submit" value="Eliminar" name="eliminar">
             </div>
         </div>
     </form>
 
     
+
+    
 </body>
 </html>
 <?php 
-    if($mostrarTabla == true){
-        function buscar_rango($inicio, $fin) {
-            $inicio = ip2long($inicio);
-            $fin = ip2long($fin);
-            return array_map('long2ip', range($inicio, $fin) );
-        }
-    
+    if($buscar == true){
     
         // ping multi ip address
         $iplista = [$ipInicial,$ipFinal];
@@ -151,13 +173,114 @@
         echo "</font>";
     }
 
-    
-    
 
-    
+    if($actualizar == true){
+        $sql = "SELECT ip FROM direcciones";
+        $result = $conn->query($sql);
 
-    
+        $todasIps = [];
+        if($result->num_rows>0){
+            while($row = $result->fetch_assoc()){
+                $todasIps[] = $row['ip'];
+            }
+        }
 
+        $totalips = count($todasIps);
+        $results = [];
+        for($i=0; $i<$totalips;$i++){
+            $ip = $todasIps[$i];
+            $ping = exec("ping -n 1 $ip",$salida,$estado);
+            $results[] = $estado;
+        }
+
+        // Table
+        echo '<font face=Lucida Console>';
+        echo "<table class='contenedor table' border=1 style=border-collapse:collapse>
+        <th colspan=4> Ping Monitoring </th>
+        <tr>
+            <td width=30></td>
+            <td width=250>IP</td>
+            <td width=220>Estado</td>
+        </tr>
+        ";
+        foreach($results as $item => $k){
+            echo "<tr>";
+            echo "<td class='text-decoration'>".$item."</td>";
+            echo "<td class='text-decoration'>".$todasIps[$item]."</td>";
+            if($results[$item]==0){
+                echo "<td class='text-decoration' style=color:green>Conectado</td>";
+            } else {
+                echo "<td class='text-decoration' style=color:grey>Desconectado</td>";
+            }
+            echo "</tr>";
+        }
+    
+        echo "</table>";
+        echo "</font>";
+    }
+
+
+
+
+
+    if($eliminar == true){
+        $iplista = [$ipInicial,$ipFinal];
+        $iplista = buscar_rango($iplista[0],$iplista[1]);
+        $totalips = count($iplista);
+
+        $results = [];
+        for($i=0; $i<$totalips;$i++){
+            $ip = $iplista[$i];
+            $sql = "DELETE FROM direcciones WHERE ip='$ip'";
+            if($conn->query($sql) == TRUE){}
+        }
+
+        $sql = "SELECT ip FROM direcciones";
+        $result = $conn->query($sql);
+
+        $todasIps = [];
+        if($result->num_rows>0){
+            while($row = $result->fetch_assoc()){
+                $todasIps[] = $row['ip'];
+            }
+        }
+
+        $totalips = count($todasIps);
+        $results = [];
+        for($i=0; $i<$totalips;$i++){
+            $ip = $todasIps[$i];
+            $ping = exec("ping -n 1 $ip",$salida,$estado);
+            $results[] = $estado;
+        }
+
+        // Table
+        echo '<font face=Lucida Console>';
+        echo "<table class='contenedor table' border=1 style=border-collapse:collapse>
+        <th colspan=4> Ping Monitoring </th>
+        <tr>
+            <td width=30></td>
+            <td width=250>IP</td>
+            <td width=220>Estado</td>
+        </tr>
+        ";
+        foreach($results as $item => $k){
+            echo "<tr>";
+            echo "<td class='text-decoration'>".$item."</td>";
+            echo "<td class='text-decoration'>".$todasIps[$item]."</td>";
+            if($results[$item]==0){
+                echo "<td class='text-decoration' style=color:green>Conectado</td>";
+            } else {
+                echo "<td class='text-decoration' style=color:grey>Desconectado</td>";
+            }
+            echo "</tr>";
+        }
+    
+        echo "</table>";
+        echo "</font>";
+    }
 
 ?>
+
+
+
 
