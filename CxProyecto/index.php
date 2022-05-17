@@ -1,5 +1,15 @@
 <?php
+    $dbServername = "localhost";
+    $dbUsername = "root";
+    $dbPassword = "";
+    $dbName = "cxproyecto";
+
+    $conn = mysqli_connect($dbServername,$dbUsername,$dbPassword,$dbName);
+
     $mostrarTabla = false;
+    $ipFinal ="";
+    $ipInicial = "";
+    $bdVacio = true;
 
     if($_SERVER['REQUEST_METHOD'] == "POST"){
 
@@ -17,6 +27,9 @@
             $mostrarTabla = true;
         } 
     }
+
+    
+
 
 ?>
 
@@ -38,7 +51,6 @@
 
 
     <header class="header">
-
         <div class="header__texto">
             <h2 class="no-margin">Monitorizador de Ip</h2>
         </div>
@@ -50,7 +62,14 @@
         <div class="contenedor-campos">
             <div class="campos">
                 <label for="">Direccion inicial</label>
-                <input class="input-text" type="text" placeholder="192.123.1.0" name="ip-inicial">
+                <input class="input-text" type="text" placeholder="192.123.1.0" name="ip-inicial" value="<?php 
+                if(empty($ipInicial)){
+                    echo "";
+                } else {
+                    echo $ipInicial;
+                }
+                
+                ?>">
             </div>
             <div class="campos">
                 <label for="">Direccion final (opcional)</label>
@@ -59,7 +78,6 @@
             <div class="">
                 <input class="boton " type="submit" value="Buscar">
             </div>
-            
         </div>
     </form>
 
@@ -67,7 +85,6 @@
 </body>
 </html>
 <?php 
-
     if($mostrarTabla == true){
         function buscar_rango($inicio, $fin) {
             $inicio = ip2long($inicio);
@@ -81,13 +98,32 @@
     
         $iplista = buscar_rango($iplista[0],$iplista[1]);
         $totalips = count($iplista);
-        $results = [];
     
         for($i=0; $i<$totalips;$i++){
             $ip = $iplista[$i];
+            $sql = "INSERT INTO direcciones (ip) VALUES ('$ip')";
+            if($conn->query($sql) === TRUE) {}
+        }
+
+        // Seleccionando de Base de datos y agregando a $todasIps
+        $sql = "SELECT ip FROM direcciones";
+        $result = $conn->query($sql);
+
+        $todasIps = [];
+        if($result->num_rows>0){
+            while($row = $result->fetch_assoc()){
+                $todasIps[] = $row['ip'];
+            }
+        }
+
+        $totalips = count($todasIps);
+        $results = [];
+        for($i=0; $i<$totalips;$i++){
+            $ip = $todasIps[$i];
             $ping = exec("ping -n 1 $ip",$salida,$estado);
             $results[] = $estado;
         }
+ 
     
         // Table
         echo '<font face=Lucida Console>';
@@ -102,7 +138,7 @@
         foreach($results as $item => $k){
             echo "<tr>";
             echo "<td class='text-decoration'>".$item."</td>";
-            echo "<td class='text-decoration'>".$iplista[$item]."</td>";
+            echo "<td class='text-decoration'>".$todasIps[$item]."</td>";
             if($results[$item]==0){
                 echo "<td class='text-decoration' style=color:green>Conectado</td>";
             } else {
